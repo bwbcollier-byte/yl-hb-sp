@@ -1,0 +1,22 @@
+{
+  "name": "yl-hb-sp",
+  "version": "1.0.0",
+  "description": "Spotify Artist Enrichment for Hypebase",
+  "main": "dist/social-enrich-spotify.js",
+  "scripts": {
+    "start": "ts-node src/social-enrich-spotify.ts",
+    "build": "tsc",
+    "enrich-spotify": "ts-node src/social-enrich-spotify.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.3",
+    "dotenv": "^16.4.1",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/node-fetch": "^2.6.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

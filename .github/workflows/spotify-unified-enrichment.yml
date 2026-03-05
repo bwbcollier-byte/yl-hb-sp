@@ -1,0 +1,45 @@
+name: Unified Spotify Artist Enrichment
+
+on:
+  schedule:
+    # Run twice daily at 2 AM and 2 PM UTC
+    - cron: "0 2,14 * * *"
+  workflow_dispatch:
+    inputs:
+      id:
+        description: "Optional specific Spotify ID to process"
+        required: false
+        default: ""
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run enrichment
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RAPID_API_KEY: ${{ secrets.RAPID_API_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.id }}" ]; then
+            node dist/social-enrich-spotify.js --id "${{ github.event.inputs.id }}"
+          else
+            node dist/social-enrich-spotify.js
+          fi
