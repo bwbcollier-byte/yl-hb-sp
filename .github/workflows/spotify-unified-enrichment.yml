@@ -1,20 +1,21 @@
-name: Unified Spotify Artist Enrichment
+name: Spotify Profile Enrichment
 
 on:
   schedule:
-    # Run twice daily at 2 AM and 2 PM UTC
-    - cron: "0 2,14 * * *"
+    # Run every 6 hours
+    - cron: "0 */6 * * *"
   workflow_dispatch:
     inputs:
-      id:
-        description: "Optional specific Spotify ID to process"
+      limit:
+        description: "Max profiles to enrich (default: 100)"
         required: false
-        default: ""
+        default: "100"
+        type: string
 
 jobs:
   enrich:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 60
 
     steps:
       - name: Notify Supabase — start
@@ -27,7 +28,8 @@ jobs:
             -H "apikey: $SUPABASE_SERVICE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"p_workflow_id": 241881402, "p_status": "running", "p_run_id": "${{ github.run_id }}"  }'
+            -d '{"p_workflow_id": ${{ vars.WORKFLOW_ID_SPOTIFY_ENRICHMENT }}, "p_status": "running", "p_run_id": "${{ github.run_id }}"}'
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -40,20 +42,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build TypeScript
-        run: npm run build
-
-      - name: Run enrichment
+      - name: Run Spotify Enrichment
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          RAPID_API_KEY: ${{ secrets.RAPID_API_KEY }}
-        run: |
-          if [ -n "${{ github.event.inputs.id }}" ]; then
-            node dist/social-enrich-spotify.js --id "${{ github.event.inputs.id }}"
-          else
-            node dist/social-enrich-spotify.js
-          fi
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          LIMIT: ${{ github.event.inputs.limit || '100' }}
+          STALE_DAYS: "30"
+          CONCURRENCY: "3"
+          WORKFLOW_ID: ${{ vars.WORKFLOW_ID_SPOTIFY_ENRICHMENT }}
+        run: npx ts-node --transpile-only src/spotify-enrichment.ts
+
       - name: Notify Supabase — result
         if: always()
         env:
@@ -62,7 +61,7 @@ jobs:
         run: |
           DURATION=$(( $(date +%s) - $START_TIME ))
           STATUS="${{ job.status }}"
-          PAYLOAD=$(printf '{"p_workflow_id": 241881402, "p_status": "%s", "p_duration_secs": %s, "p_run_id": "${{ github.run_id }}"}' "$STATUS" "$DURATION")
+          PAYLOAD=$(printf '{"p_workflow_id": ${{ vars.WORKFLOW_ID_SPOTIFY_ENRICHMENT }}, "p_status": "%s", "p_duration_secs": %s, "p_run_id": "${{ github.run_id }}"}' "$STATUS" "$DURATION")
           curl -s -X POST "$SUPABASE_URL/rest/v1/rpc/log_workflow_run" \
             -H "apikey: $SUPABASE_SERVICE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
