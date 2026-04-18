@@ -12,6 +12,18 @@ const WORKFLOW_ID   = parseInt(process.env.WORKFLOW_ID || '0');
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// Retry wrapper for Supabase queries that can fail on cold-start
+async function withRetry<T>(fn: () => Promise<{ data: T; error: any }>, attempts = 3, delayMs = 3000): Promise<{ data: T; error: any }> {
+    let last: { data: T; error: any } = { data: null as any, error: null };
+    for (let i = 1; i <= attempts; i++) {
+        if (i > 1) await sleep(delayMs);
+        last = await fn();
+        if (!last.error) return last;
+        console.warn(`   ⚠️  Supabase query attempt ${i}/${attempts} failed: ${last.error.message}`);
+    }
+    return last;
+}
+
 function chunk<T>(arr: T[], size: number): T[][] {
     const out: T[][] = [];
     for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -89,10 +101,10 @@ async function loadTalentMap(talentIds: string[]): Promise<Map<string, any>> {
     if (!talentIds.length) return map;
 
     for (const ids of chunk(talentIds, 200)) {
-        const { data, error } = await supabase
+        const { data, error } = await withRetry(() => supabase
             .from('hb_talent')
             .select('id, name, image, biography')
-            .in('id', ids);
+            .in('id', ids));
         if (error) { console.warn(`   ⚠️  Talent pre-load chunk error: ${error.message}`); continue; }
         for (const t of data || []) map.set(t.id, t);
     }
@@ -131,13 +143,13 @@ async function run() {
     const staleThreshold = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
     // Priority: never enriched first (check_spotify_enrichment IS NULL), then stale
-    const { data: socials, error } = await supabase
+    const { data: socials, error } = await withRetry(() => supabase
         .from('hb_socials')
         .select('id, identifier, name, linked_talent, check_spotify_enrichment')
         .eq('type', 'SPOTIFY')
         .or(`check_spotify_enrichment.is.null,check_spotify_enrichment.lt.${staleThreshold}`)
         .order('check_spotify_enrichment', { ascending: true, nullsFirst: true })
-        .limit(LIMIT);
+        .limit(LIMIT));
 
     if (error) throw error;
     if (!socials?.length) {
