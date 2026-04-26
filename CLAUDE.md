@@ -23,9 +23,8 @@ external links.
 
 ```
 src/
-  spotify-enrichment.ts    # canonical entry point — invoked by the workflow
+  spotify-enrichment.ts    # entry point — invoked by the workflow
   supabase.ts              # service-role client (autoRefreshToken/persistSession off)
-  social-enrich-spotify.ts # ⚠️ DEAD CODE — see "Per-repo gotchas" below
 .github/workflows/
   spotify-unified-enrichment.yml
 package.json
@@ -66,27 +65,16 @@ cp .env.example .env.local      # if .env.example exists; otherwise create .env
 # Optional: LIMIT (default 100), STALE_DAYS (30), CONCURRENCY (3),
 #           SLEEP_MS (1500), WORKFLOW_ID
 npm install
-npm start                        # alias: ts-node src/social-enrich-spotify.ts (DEAD)
-                                 # the workflow runs spotify-enrichment.ts directly
-npx ts-node --transpile-only src/spotify-enrichment.ts   # canonical entry
+npm start                        # → ts-node --transpile-only src/spotify-enrichment.ts
 ```
-
-> ⚠️ `npm start` runs the **dead** file, not the canonical one. The
-> CI workflow invokes `src/spotify-enrichment.ts` directly via
-> `npx ts-node`. Either delete the dead file (preferred — see gotchas) or
-> repoint the `start` script in `package.json`.
 
 ## Per-repo gotchas
 
-- **`src/social-enrich-spotify.ts` is dead code.** It references tables that
-  don't exist on the live Supabase DB (`social_profiles`, `talent_profiles`,
-  `media_profiles`, `event_profiles`) and was superseded by
-  `spotify-enrichment.ts` in commit `19279be` ("feat: rewrite Spotify
-  enrichment for hb_socials/hb_talent"). It also contains a **hardcoded
-  fallback RapidAPI key** at line 20 — that key is now exposed in git history
-  and should be considered compromised. Recommended action: delete the file
-  and rotate the RapidAPI key. The `package.json` `main` field and the `start`
-  script also still point at it; update both.
+- **A hardcoded fallback RapidAPI key was committed to git history**
+  in the now-deleted `src/social-enrich-spotify.ts` (deleted as part of
+  cleanup, but the value remains in git history at the parent of the
+  deletion commit). Treat that key as compromised and rotate it in
+  RapidAPI before relying on the new `RAPIDAPI_KEY` env var alone.
 - **RapidAPI host is `spotify-api25.p.rapidapi.com`.** RapidAPI hosts come and
   go; if requests start 404'ing across the board, check the host name.
 - **429 handling:** the script retries once after 10s on 429, then gives up
