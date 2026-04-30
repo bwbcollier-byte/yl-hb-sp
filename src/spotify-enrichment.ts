@@ -258,7 +258,6 @@ async function run() {
                     social_url:    link.url,
                     linked_talent: social.linked_talent,
                     status:        'Done',
-                    last_check:    now,
                 });
             }
         }));
