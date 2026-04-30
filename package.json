@@ -2,11 +2,11 @@
   "name": "yl-hb-sp",
   "version": "1.0.0",
   "description": "Spotify Artist Enrichment for Hypebase",
-  "main": "dist/social-enrich-spotify.js",
+  "main": "dist/spotify-enrichment.js",
   "scripts": {
-    "start": "ts-node src/social-enrich-spotify.ts",
+    "start": "ts-node --transpile-only src/spotify-enrichment.ts",
     "build": "tsc",
-    "enrich-spotify": "ts-node src/social-enrich-spotify.ts"
+    "enrich-spotify": "ts-node --transpile-only src/spotify-enrichment.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",

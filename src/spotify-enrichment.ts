@@ -270,7 +270,6 @@ async function run() {
                     social_url:    link.url,
                     linked_talent: social.linked_talent,
                     status:        'Done',
-                    last_check:    now,
                 });
             }
         }));
@@ -282,9 +281,11 @@ async function run() {
     console.log(`\n💾 Applying batch updates...`);
 
     if (socialUpdates.length > 0) {
-        const { error: sErr } = await supabase.from('hb_socials').upsert(socialUpdates);
-        if (sErr) console.error(`❌ Social batch error: ${sErr.message}`);
-        else console.log(`   ✅ Updated ${socialUpdates.length} social records`);
+        for (const ch of chunk(socialUpdates, 200)) {
+            const { error: sErr } = await supabase.from('hb_socials').upsert(ch);
+            if (sErr) console.error(`❌ Social batch error: ${sErr.message}`);
+        }
+        console.log(`   ✅ Updated ${socialUpdates.length} social records`);
     }
 
     if (talentUpdates.length > 0) {
@@ -296,14 +297,13 @@ async function run() {
     }
 
     if (externalSocials.length > 0) {
-        const { error: eErr } = await supabase
-            .from('hb_socials')
-            .upsert(externalSocials, { onConflict: 'type,identifier', ignoreDuplicates: true });
-        if (eErr) {
-            console.warn(`   ⚠️  External social upsert failed (${eErr.message}), skipping`);
-        } else {
-            console.log(`   ✅ Synced ${externalSocials.length} external socials (IG/TW/FB/WP)`);
+        for (const ch of chunk(externalSocials, 200)) {
+            const { error: eErr } = await supabase
+                .from('hb_socials')
+                .upsert(ch, { onConflict: 'type,identifier', ignoreDuplicates: true });
+            if (eErr) console.warn(`   ⚠️  External social upsert failed (${eErr.message}), skipping`);
         }
+        console.log(`   ✅ Synced ${externalSocials.length} external socials (IG/TW/FB/WP)`);
     }
 
     const durationSecs = Math.round((Date.now() - runStart) / 1000);
