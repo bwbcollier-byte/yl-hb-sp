@@ -142,26 +142,38 @@ async function run() {
 
     const staleThreshold = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-    // Priority: never enriched first (check_spotify_enrichment IS NULL), then stale
-    const { data: socials, error } = await withRetry(() => supabase
-        .from('hb_socials')
-        .select('id, identifier, name, linked_talent, check_spotify_enrichment')
-        .eq('type', 'SPOTIFY')
-        .or(`check_spotify_enrichment.is.null,check_spotify_enrichment.lt.${staleThreshold}`)
-        .order('check_spotify_enrichment', { ascending: true, nullsFirst: true })
-        .limit(LIMIT));
+    // Split into two queries so each can use the partial index on check_spotify_enrichment
+    // WHERE (type = 'SPOTIFY'). A single OR query prevents the planner from using it.
+    const [neverResult, staleResult] = await Promise.all([
+        withRetry(() => supabase
+            .from('hb_socials')
+            .select('id, identifier, name, linked_talent, check_spotify_enrichment')
+            .eq('type', 'SPOTIFY')
+            .is('check_spotify_enrichment', null)
+            .limit(LIMIT)),
+        withRetry(() => supabase
+            .from('hb_socials')
+            .select('id, identifier, name, linked_talent, check_spotify_enrichment')
+            .eq('type', 'SPOTIFY')
+            .not('check_spotify_enrichment', 'is', null)
+            .lt('check_spotify_enrichment', staleThreshold)
+            .order('check_spotify_enrichment', { ascending: true })
+            .limit(LIMIT)),
+    ]);
 
-    if (error) throw error;
-    if (!socials?.length) {
+    if (neverResult.error) throw neverResult.error;
+    if (staleResult.error) throw staleResult.error;
+
+    const neverEnriched = neverResult.data ?? [];
+    const staleEnriched = staleResult.data ?? [];
+    const ordered = [...neverEnriched, ...staleEnriched].slice(0, LIMIT);
+
+    if (!ordered.length) {
         console.log('✅ No stale Spotify profiles to enrich.');
         const durationSecs = Math.round((Date.now() - runStart) / 1000);
         await updateWorkflowSummary('success', { enriched: 0, run_at: new Date().toISOString() }, durationSecs);
         return;
     }
-
-    const neverEnriched = socials.filter(s => s.check_spotify_enrichment === null);
-    const staleEnriched = socials.filter(s => s.check_spotify_enrichment !== null);
-    const ordered = [...neverEnriched, ...staleEnriched].slice(0, LIMIT);
 
     console.log(`   Found ${ordered.length} profiles (${neverEnriched.length} never enriched, ${staleEnriched.length} stale).\n`);
 
