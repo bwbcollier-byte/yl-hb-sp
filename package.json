@@ -4,19 +4,18 @@
   "description": "Spotify Artist Enrichment for Hypebase",
   "main": "dist/spotify-enrichment.js",
   "scripts": {
-    "start": "ts-node --transpile-only src/spotify-enrichment.ts",
+    "start": "tsx src/spotify-enrichment.ts",
     "build": "tsc",
-    "enrich-spotify": "ts-node --transpile-only src/spotify-enrichment.ts"
+    "enrich-spotify": "tsx src/spotify-enrichment.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",
-    "dotenv": "^16.4.1",
-    "node-fetch": "^2.7.0"
+    "dotenv": "^16.4.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.5",
     "@types/node-fetch": "^2.6.11",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "tsx": "^4.19.0"
   }
 }
